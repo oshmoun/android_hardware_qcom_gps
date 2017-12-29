@@ -127,12 +127,14 @@ public:
     virtual void startTrackingCommand() {}
     virtual void stopTrackingCommand() {}
     virtual void getZppCommand() {}
-    virtual void reportPositionEvent(const UlpLocation& location,
-                                     const GpsLocationExtended& locationExtended,
-                                     enum loc_sess_status status,
-                                     LocPosTechMask loc_technology_mask,
-                                     bool fromUlp=false);
-    virtual void reportSvEvent(const GnssSvNotification& svNotify, bool fromUlp=false);
+    virtual void reportPosition(UlpLocation &location,
+                                GpsLocationExtended &locationExtended,
+                                void* locationExt,
+                                enum loc_sess_status status,
+                                LocPosTechMask loc_technology_mask);
+    virtual void reportSv(LocGnssSvStatus &svStatus,
+                          GpsLocationExtended &locationExtended,
+                          void* svExt);
     virtual void reportNmeaEvent(const char* nmea, size_t length, bool fromUlp=false);
     virtual void reportSvMeasurementEvent(GnssSvMeasurementSet &svMeasurementSet);
     virtual void reportSvPolynomialEvent(GnssSvPolynomial &svPolynomial);
@@ -147,10 +149,11 @@ public:
     virtual bool requestSuplES(int connHandle);
     virtual bool reportDataCallOpened();
     virtual bool reportDataCallClosed();
-    virtual bool requestNiNotifyEvent(const GnssNiNotification &notify, const void* data);
+    virtual bool requestNiNotify(LocGpsNiNotification &notify,
+                                 const void* data);
     inline virtual bool isInSession() { return false; }
     ContextBase* getContext() const { return mContext; }
-    virtual void reportGnssMeasurementDataEvent(const GnssMeasurementsNotification& measurementsNotify);
+    virtual void reportGnssMeasurementData(LocGnssData &gnssMeasurementData);
     virtual bool reportWwanZppFix(LocGpsLocation &zppLoc);
 };
 

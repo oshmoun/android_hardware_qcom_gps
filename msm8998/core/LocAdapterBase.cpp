@@ -75,23 +75,24 @@ void LocAdapterBase::handleEngineDownEvent()
 }
 
 void LocAdapterBase::
-    reportPositionEvent(const UlpLocation& location,
-                        const GpsLocationExtended& locationExtended,
-                        enum loc_sess_status status,
-                        LocPosTechMask loc_technology_mask,
-                        bool fromUlp) {
-    if (mLocAdapterProxyBase != NULL) {
-        mLocAdapterProxyBase->reportPositionEvent((UlpLocation&)location,
-                                                   (GpsLocationExtended&)locationExtended,
-                                                   status,
-                                                   loc_technology_mask);
-    } else {
+    reportPosition(UlpLocation &location,
+                   GpsLocationExtended &locationExtended,
+                   void* locationExt,
+                   enum loc_sess_status status,
+                   LocPosTechMask loc_technology_mask) {
+    if (mLocAdapterProxyBase == NULL ||
+        !mLocAdapterProxyBase->reportPosition(location,
+                                              locationExtended,
+                                              status,
+                                              loc_technology_mask)) {
         DEFAULT_IMPL()
     }
 }
 
 void LocAdapterBase::
-    reportSvEvent(const GnssSvNotification& svNotify, bool fromUlp)
+    reportSv(LocGnssSvStatus &svStatus,
+             GpsLocationExtended &locationExtended,
+             void* svExt)
 DEFAULT_IMPL()
 
 void LocAdapterBase::
@@ -149,11 +150,11 @@ bool LocAdapterBase::
 DEFAULT_IMPL(false)
 
 bool LocAdapterBase::
-    requestNiNotifyEvent(const GnssNiNotification &notify, const void* data)
+    requestNiNotify(LocGpsNiNotification &notify, const void* data)
 DEFAULT_IMPL(false)
 
 void LocAdapterBase::
-    reportGnssMeasurementDataEvent(const GnssMeasurementsNotification& measurementsNotify)
+    reportGnssMeasurementData(LocGnssData &gnssMeasurementData)
 DEFAULT_IMPL()
 
 bool LocAdapterBase::

@@ -109,12 +109,15 @@ public:
     // upward calls
     void handleEngineUpEvent();
     void handleEngineDownEvent();
-    void reportPosition(UlpLocation& location,
-                        GpsLocationExtended& locationExtended,
+    void reportPosition(UlpLocation &location,
+                        GpsLocationExtended &locationExtended,
+                        void* locationExt,
                         enum loc_sess_status status,
                         LocPosTechMask loc_technology_mask =
                                   LOC_POS_TECH_MASK_DEFAULT);
-    void reportSv(GnssSvNotification& svNotify);
+    void reportSv(LocGnssSvStatus &svStatus,
+                  GpsLocationExtended &locationExtended,
+                  void* svExt);
     void reportSvMeasurement(GnssSvMeasurementSet &svMeasurementSet);
     void reportSvPolynomial(GnssSvPolynomial &svPolynomial);
     void reportStatus(LocGpsStatusValue status);
@@ -129,9 +132,9 @@ public:
     void requestSuplES(int connHandle);
     void reportDataCallOpened();
     void reportDataCallClosed();
-    void requestNiNotify(GnssNiNotification &notify, const void* data);
+    void requestNiNotify(LocGpsNiNotification &notify, const void* data);
     void saveSupportedMsgList(uint64_t supportedMsgList);
-    void reportGnssMeasurementData(GnssMeasurementsNotification& measurementsNotify);
+    void reportGnssMeasurementData(LocGnssData &gnssMeasurementData);
     void saveSupportedFeatureList(uint8_t *featureList);
     void reportWwanZppFix(LocGpsLocation &zppLoc);
 

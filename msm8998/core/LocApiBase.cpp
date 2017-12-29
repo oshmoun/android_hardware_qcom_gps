@@ -227,17 +227,18 @@ void LocApiBase::handleEngineDownEvent()
     TO_ALL_LOCADAPTERS(mLocAdapters[i]->handleEngineDownEvent());
 }
 
-void LocApiBase::reportPosition(UlpLocation& location,
-                                GpsLocationExtended& locationExtended,
+void LocApiBase::reportPosition(UlpLocation &location,
+                                GpsLocationExtended &locationExtended,
+                                void* locationExt,
                                 enum loc_sess_status status,
                                 LocPosTechMask loc_technology_mask)
 {
     // print the location info before delivering
-    LOC_LOGD("flags: %d\n  source: %d\n  latitude: %f\n  longitude: %f\n  "
+    LOC_LOGV("flags: %d\n  source: %d\n  latitude: %f\n  longitude: %f\n  "
              "altitude: %f\n  speed: %f\n  bearing: %f\n  accuracy: %f\n  "
              "timestamp: %lld\n  rawDataSize: %d\n  rawData: %p\n  "
              "Session status: %d\n Technology mask: %u\n "
-             "SV used in fix (gps/glo/bds/gal) : (%x/%x/%x/%x)",
+             "SV used in fix (gps/glo/bds/gal/qzss) : (%x/%x/%x/%x/%x)",
              location.gpsLocation.flags, location.position_source,
              location.gpsLocation.latitude, location.gpsLocation.longitude,
              location.gpsLocation.altitude, location.gpsLocation.speed,
@@ -247,11 +248,15 @@ void LocApiBase::reportPosition(UlpLocation& location,
              locationExtended.gnss_sv_used_ids.gps_sv_used_ids_mask,
              locationExtended.gnss_sv_used_ids.glo_sv_used_ids_mask,
              locationExtended.gnss_sv_used_ids.bds_sv_used_ids_mask,
-             locationExtended.gnss_sv_used_ids.gal_sv_used_ids_mask);
+             locationExtended.gnss_sv_used_ids.gal_sv_used_ids_mask,
+             locationExtended.gnss_sv_used_ids.qzss_sv_used_ids_mask);
     // loop through adapters, and deliver to all adapters.
     TO_ALL_LOCADAPTERS(
-        mLocAdapters[i]->reportPositionEvent(location, locationExtended,
-                                             status, loc_technology_mask)
+        mLocAdapters[i]->reportPosition(location,
+                                        locationExtended,
+                                        locationExt,
+                                        status,
+                                        loc_technology_mask)
     );
 }
 
@@ -261,7 +266,9 @@ void LocApiBase::reportWwanZppFix(LocGpsLocation &zppLoc)
     TO_1ST_HANDLING_LOCADAPTERS(mLocAdapters[i]->reportWwanZppFix(zppLoc));
 }
 
-void LocApiBase::reportSv(GnssSvNotification& svNotify)
+void LocApiBase::reportSv(LocGnssSvStatus &svStatus,
+                  GpsLocationExtended &locationExtended,
+                  void* svExt)
 {
     const char* constellationString[] = { "Unknown", "GPS", "SBAS", "GLONASS",
         "QZSS", "BEIDOU", "GALILEO" };
@@ -270,25 +277,27 @@ void LocApiBase::reportSv(GnssSvNotification& svNotify)
     LOC_LOGV("num sv: %d\n"
         "      sv: constellation svid         cN0"
         "    elevation    azimuth    flags",
-        svNotify.count);
-    for (int i = 0; i < svNotify.count && i < LOC_GNSS_MAX_SVS; i++) {
-        if (svNotify.gnssSvs[i].type >
+        svStatus.num_svs);
+    for (int i = 0; i < svStatus.num_svs && i < LOC_GNSS_MAX_SVS; i++) {
+        if (svStatus.gnss_sv_list[i].constellation >
             sizeof(constellationString) / sizeof(constellationString[0]) - 1) {
-            svNotify.gnssSvs[i].type = GNSS_SV_TYPE_UNKNOWN;
+            svStatus.gnss_sv_list[i].constellation = 0;
         }
         LOC_LOGV("   %03d: %*s  %02d    %f    %f    %f   0x%02X",
             i,
             13,
-            constellationString[svNotify.gnssSvs[i].type],
-            svNotify.gnssSvs[i].svId,
-            svNotify.gnssSvs[i].cN0Dbhz,
-            svNotify.gnssSvs[i].elevation,
-            svNotify.gnssSvs[i].azimuth,
-            svNotify.gnssSvs[i].gnssSvOptionsMask);
+            constellationString[svStatus.gnss_sv_list[i].constellation],
+            svStatus.gnss_sv_list[i].svid,
+            svStatus.gnss_sv_list[i].c_n0_dbhz,
+            svStatus.gnss_sv_list[i].elevation,
+            svStatus.gnss_sv_list[i].azimuth,
+            svStatus.gnss_sv_list[i].flags);
     }
     // loop through adapters, and deliver to all adapters.
     TO_ALL_LOCADAPTERS(
-        mLocAdapters[i]->reportSvEvent(svNotify)
+        mLocAdapters[i]->reportSv(svStatus,
+            locationExtended,
+            svExt)
         );
 }
 
@@ -376,10 +385,10 @@ void LocApiBase::reportDataCallClosed()
     TO_1ST_HANDLING_LOCADAPTERS(mLocAdapters[i]->reportDataCallClosed());
 }
 
-void LocApiBase::requestNiNotify(GnssNiNotification &notify, const void* data)
+void LocApiBase::requestNiNotify(LocGpsNiNotification &notify, const void* data)
 {
     // loop through adapters, and deliver to the first handling adapter.
-    TO_1ST_HANDLING_LOCADAPTERS(mLocAdapters[i]->requestNiNotifyEvent(notify, data));
+    TO_1ST_HANDLING_LOCADAPTERS(mLocAdapters[i]->requestNiNotify(notify, data));
 }
 
 void LocApiBase::saveSupportedMsgList(uint64_t supportedMsgList)
@@ -398,10 +407,10 @@ void* LocApiBase :: getSibling()
 LocApiProxyBase* LocApiBase :: getLocApiProxy()
     DEFAULT_IMPL(NULL)
 
-void LocApiBase::reportGnssMeasurementData(GnssMeasurementsNotification& measurementsNotify)
+void LocApiBase::reportGnssMeasurementData(LocGnssData &gnssMeasurementData)
 {
     // loop through adapters, and deliver to all adapters.
-    TO_ALL_LOCADAPTERS(mLocAdapters[i]->reportGnssMeasurementDataEvent(measurementsNotify));
+    TO_ALL_LOCADAPTERS(mLocAdapters[i]->reportGnssMeasurementData(gnssMeasurementData));
 }
 
 enum loc_api_adapter_err LocApiBase::

@@ -61,15 +61,16 @@ public:
 
     inline virtual void handleEngineUpEvent() {};
     inline virtual void handleEngineDownEvent() {};
-    inline virtual void reportPositionEvent(UlpLocation &location,
-                                            GpsLocationExtended &locationExtended,
-                                            enum loc_sess_status status,
-                                            LocPosTechMask loc_technology_mask) {
+    inline virtual bool reportPosition(UlpLocation &location,
+                                       GpsLocationExtended &locationExtended,
+                                       enum loc_sess_status status,
+                                       LocPosTechMask loc_technology_mask) {
 
         (void)location;
         (void)locationExtended;
         (void)status;
         (void)loc_technology_mask;
+        return false;
     }
 };
 
