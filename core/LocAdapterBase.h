@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, 2016-2017 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, 2016-2018 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -30,7 +30,6 @@
 #define LOC_API_ADAPTER_BASE_H
 
 #include <gps_extended.h>
-#include <UlpProxyBase.h>
 #include <ContextBase.h>
 #include <LocationAPI.h>
 #include <map>
@@ -51,6 +50,7 @@ inline bool operator !=(LocationSessionKey const& left, LocationSessionKey const
     return left.id != right.id || left.client != right.client;
 }
 typedef std::map<LocationSessionKey, LocationOptions> LocationSessionMap;
+typedef std::map<LocationSessionKey, TrackingOptions> TrackingOptionsMap;
 
 namespace loc_core {
 
@@ -59,6 +59,7 @@ class LocAdapterProxyBase;
 class LocAdapterBase {
 private:
     static uint32_t mSessionIdCounter;
+    const bool mIsMaster;
 protected:
     LOC_API_ADAPTER_EVENT_MASK_T mEvtMask;
     ContextBase* mContext;
@@ -66,12 +67,18 @@ protected:
     LocAdapterProxyBase* mLocAdapterProxyBase;
     const MsgTask* mMsgTask;
     inline LocAdapterBase(const MsgTask* msgTask) :
-        mEvtMask(0), mContext(NULL), mLocApi(NULL),
+        mIsMaster(false), mEvtMask(0), mContext(NULL), mLocApi(NULL),
         mLocAdapterProxyBase(NULL), mMsgTask(msgTask) {}
+    LocAdapterBase(const LOC_API_ADAPTER_EVENT_MASK_T mask,
+        ContextBase* context, bool isMaster,
+        LocAdapterProxyBase *adapterProxyBase = NULL);
 public:
     inline virtual ~LocAdapterBase() { mLocApi->removeAdapter(this); }
-    LocAdapterBase(const LOC_API_ADAPTER_EVENT_MASK_T mask,
-                   ContextBase* context, LocAdapterProxyBase *adapterProxyBase = NULL);
+    inline LocAdapterBase(const LOC_API_ADAPTER_EVENT_MASK_T mask,
+                          ContextBase* context,
+                          LocAdapterProxyBase *adapterProxyBase = NULL) :
+        LocAdapterBase(mask, context, false, adapterProxyBase) {}
+
     inline LOC_API_ADAPTER_EVENT_MASK_T
         checkMask(LOC_API_ADAPTER_EVENT_MASK_T mask) const {
         return mEvtMask & mask;
@@ -112,30 +119,24 @@ public:
 
     uint32_t generateSessionId();
 
-    // This will be overridden by the individual adapters
-    // if necessary.
-    inline virtual void setUlpProxyCommand(UlpProxyBase* ulp) {
-
-        (void)ulp;
+    inline bool isAdapterMaster() {
+        return mIsMaster;
     }
+
     virtual void handleEngineUpEvent();
     virtual void handleEngineDownEvent();
     inline virtual void setPositionModeCommand(LocPosMode& posMode) {
 
         (void)posMode;
     }
-    virtual void startTrackingCommand() {}
-    virtual void stopTrackingCommand() {}
-    virtual void getZppCommand() {}
     virtual void reportPositionEvent(const UlpLocation& location,
                                      const GpsLocationExtended& locationExtended,
                                      enum loc_sess_status status,
                                      LocPosTechMask loc_technology_mask,
-                                     bool fromUlp=false,
                                      bool fromEngineHub=false);
     virtual void reportSvEvent(const GnssSvNotification& svNotify,
-                               bool fromUlp=false, bool fromEngineHub=false);
-    virtual void reportNmeaEvent(const char* nmea, size_t length, bool fromUlp=false);
+                               bool fromEngineHub=false);
+    virtual void reportNmeaEvent(const char* nmea, size_t length);
     virtual void reportSvMeasurementEvent(GnssSvMeasurementSet &svMeasurementSet);
     virtual void reportSvPolynomialEvent(GnssSvPolynomial &svPolynomial);
     virtual void reportStatus(LocGpsStatusValue status);
@@ -144,11 +145,9 @@ public:
     virtual bool requestXtraData();
     virtual bool requestTime();
     virtual bool requestLocation();
-    virtual bool requestATL(int connHandle, LocAGpsType agps_type);
+    virtual bool requestATL(int connHandle, LocAGpsType agps_type,
+                            LocApnTypeMask apn_type_mask);
     virtual bool releaseATL(int connHandle);
-    virtual bool requestSuplES(int connHandle);
-    virtual bool reportDataCallOpened();
-    virtual bool reportDataCallClosed();
     virtual bool requestNiNotifyEvent(const GnssNiNotification &notify, const void* data);
     inline virtual bool isInSession() { return false; }
     ContextBase* getContext() const { return mContext; }
@@ -157,6 +156,9 @@ public:
     virtual bool reportWwanZppFix(LocGpsLocation &zppLoc);
     virtual bool reportZppBestAvailableFix(LocGpsLocation &zppLoc,
             GpsLocationExtended &location_extended, LocPosTechMask tech_mask);
+    virtual void reportGnssSvIdConfigEvent(const GnssSvIdConfig& config);
+    virtual void reportGnssSvTypeConfigEvent(const GnssSvTypeConfig& config);
+    virtual bool requestOdcpiEvent(OdcpiRequestInfo& request);
 };
 
 } // namespace loc_core

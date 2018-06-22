@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, 2016-2017The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, 2016-2018 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -42,8 +42,9 @@ namespace loc_core {
 // But if getLocApi(targetEnumType target) is overriden,
 // the right locApi should get created.
 LocAdapterBase::LocAdapterBase(const LOC_API_ADAPTER_EVENT_MASK_T mask,
-                               ContextBase* context, LocAdapterProxyBase *adapterProxyBase) :
-    mEvtMask(mask), mContext(context),
+                               ContextBase* context, bool isMaster,
+                               LocAdapterProxyBase *adapterProxyBase) :
+    mIsMaster(isMaster), mEvtMask(mask), mContext(context),
     mLocApi(context->getLocApi()), mLocAdapterProxyBase(adapterProxyBase),
     mMsgTask(context->getMsgTask())
 {
@@ -79,7 +80,7 @@ void LocAdapterBase::
                         const GpsLocationExtended& locationExtended,
                         enum loc_sess_status status,
                         LocPosTechMask loc_technology_mask,
-                        bool /*fromUlp*/, bool /*fromEngineHub*/) {
+                        bool /*fromEngineHub*/) {
     if (mLocAdapterProxyBase != NULL) {
         mLocAdapterProxyBase->reportPositionEvent((UlpLocation&)location,
                                                    (GpsLocationExtended&)locationExtended,
@@ -92,7 +93,7 @@ void LocAdapterBase::
 
 void LocAdapterBase::
     reportSvEvent(const GnssSvNotification& /*svNotify*/,
-                  bool /*fromUlp*/, bool /*fromEngineHub*/)
+                  bool /*fromEngineHub*/)
 DEFAULT_IMPL()
 
 void LocAdapterBase::
@@ -109,7 +110,7 @@ DEFAULT_IMPL()
 
 
 void LocAdapterBase::
-    reportNmeaEvent(const char* /*nmea*/, size_t /*length*/, bool /*fromUlp*/)
+    reportNmeaEvent(const char* /*nmea*/, size_t /*length*/)
 DEFAULT_IMPL()
 
 bool LocAdapterBase::
@@ -130,23 +131,12 @@ bool LocAdapterBase::
 DEFAULT_IMPL(false)
 
 bool LocAdapterBase::
-    requestATL(int /*connHandle*/, LocAGpsType /*agps_type*/)
+    requestATL(int /*connHandle*/, LocAGpsType /*agps_type*/,
+               LocApnTypeMask /*apn_type_mask*/)
 DEFAULT_IMPL(false)
 
 bool LocAdapterBase::
     releaseATL(int /*connHandle*/)
-DEFAULT_IMPL(false)
-
-bool LocAdapterBase::
-    requestSuplES(int /*connHandle*/)
-DEFAULT_IMPL(false)
-
-bool LocAdapterBase::
-    reportDataCallOpened()
-DEFAULT_IMPL(false)
-
-bool LocAdapterBase::
-    reportDataCallClosed()
 DEFAULT_IMPL(false)
 
 bool LocAdapterBase::
@@ -167,5 +157,14 @@ bool LocAdapterBase::
             GpsLocationExtended& /*location_extended*/, LocPosTechMask /*tech_mask*/)
 DEFAULT_IMPL(false)
 
+void LocAdapterBase::reportGnssSvIdConfigEvent(const GnssSvIdConfig& /*config*/)
+DEFAULT_IMPL()
+
+void LocAdapterBase::reportGnssSvTypeConfigEvent(const GnssSvTypeConfig& /*config*/)
+DEFAULT_IMPL()
+
+bool LocAdapterBase::
+    requestOdcpiEvent(OdcpiRequestInfo& /*request*/)
+DEFAULT_IMPL(false)
 
 } // namespace loc_core

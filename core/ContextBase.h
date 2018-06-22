@@ -67,6 +67,7 @@ typedef struct loc_gps_cfg_s
     uint32_t       EXTERNAL_DR_ENABLED;
     char           SUPL_HOST[MAX_SUPL_SERVER_URL_LENGTH];
     uint32_t       SUPL_PORT;
+    uint32_t       MODEM_TYPE;
 } loc_gps_cfg_s_type;
 
 /* NOTE: the implementaiton of the parser casts number
@@ -127,13 +128,8 @@ public:
     inline LocApiBase* getLocApi() { return mLocApi; }
     inline LocApiProxyBase* getLocApiProxy() { return mLocApiProxy; }
     inline bool hasAgpsExtendedCapabilities() { return mLBSProxy->hasAgpsExtendedCapabilities(); }
-    inline bool hasCPIExtendedCapabilities() { return mLBSProxy->hasCPIExtendedCapabilities(); }
     inline bool hasNativeXtraClient() { return mLBSProxy->hasNativeXtraClient(); }
     inline void modemPowerVote(bool power) const { return mLBSProxy->modemPowerVote(power); }
-    inline void requestUlp(LocAdapterBase* adapter,
-                           unsigned long capabilities) {
-        mLBSProxy->requestUlp(adapter, capabilities);
-    }
     inline IzatDevId_t getIzatDevId() const {
         return mLBSProxy->getIzatDevId();
     }

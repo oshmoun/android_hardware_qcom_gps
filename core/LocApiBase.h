@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, 2016-2017 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, 2016-2018 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -121,6 +121,7 @@ protected:
     inline virtual ~LocApiBase() { close(); }
     bool isInSession();
     const LOC_API_ADAPTER_EVENT_MASK_T mExcludedMask;
+    bool isMaster();
 
 public:
     inline void sendMsg(const LocMsg* msg) const {
@@ -147,16 +148,16 @@ public:
     void requestXtraData();
     void requestTime();
     void requestLocation();
-    void requestATL(int connHandle, LocAGpsType agps_type);
+    void requestATL(int connHandle, LocAGpsType agps_type, LocApnTypeMask apn_type_mask);
     void releaseATL(int connHandle);
-    void requestSuplES(int connHandle);
-    void reportDataCallOpened();
-    void reportDataCallClosed();
     void requestNiNotify(GnssNiNotification &notify, const void* data);
     void reportGnssMeasurementData(GnssMeasurementsNotification& measurements, int msInWeek);
     void reportWwanZppFix(LocGpsLocation &zppLoc);
     void reportZppBestAvailableFix(LocGpsLocation &zppLoc, GpsLocationExtended &location_extended,
             LocPosTechMask tech_mask);
+    void reportGnssSvIdConfig(const GnssSvIdConfig& config);
+    void reportGnssSvTypeConfig(const GnssSvTypeConfig& config);
+    void requestOdcpi(OdcpiRequestInfo& request);
 
     // downward calls
     // All below functions are to be defined by adapter specific modules:
@@ -173,6 +174,8 @@ public:
     virtual void
         injectPosition(double latitude, double longitude, float accuracy);
     virtual void
+        injectPosition(const Location& location, bool onDemandCpi);
+    virtual void
         setTime(LocGpsUtcTime time, int64_t timeReference, int uncertainty);
 
  //   // TODO:: called from izatapipds
@@ -181,7 +184,8 @@ public:
 
     virtual void
         atlOpenStatus(int handle, int is_succ, char* apn, uint32_t apnLen,
-                AGpsBearerType bear, LocAGpsType agpsType);
+                      AGpsBearerType bear, LocAGpsType agpsType,
+                      LocApnTypeMask mask);
     virtual void
         atlCloseStatus(int handle, int is_succ);
     virtual void
@@ -230,15 +234,8 @@ public:
     virtual GnssConfigLppeControlPlaneMask convertLppeCp(const uint32_t lppeControlPlaneMask);
     virtual GnssConfigLppeUserPlaneMask convertLppeUp(const uint32_t lppeUserPlaneMask);
 
-    virtual enum loc_api_adapter_err
-        getWwanZppFix();
-    virtual void
-        getBestAvailableZppFix();
-    virtual int initDataServiceClient(bool isDueToSsr);
-    virtual int openAndStartDataCall();
-    virtual void stopDataCall();
-    virtual void closeDataCall();
-    virtual void releaseDataServiceClient();
+    virtual void getWwanZppFix();
+    virtual void getBestAvailableZppFix();
     virtual void installAGpsCert(const LocDerEncodedCertificate* pData,
                                  size_t length,
                                  uint32_t slotBitMask);
@@ -251,15 +248,16 @@ public:
     void updateEvtMask();
 
     virtual LocationError setGpsLockSync(GnssConfigGpsLock lock);
-    /*
-      Returns
-      Current value of GPS Lock on success
-      -1 on failure
-     */
-    virtual int getGpsLock(void);
 
     virtual LocationError setXtraVersionCheckSync(uint32_t check);
 
+    /* Requests for SV/Constellation Control */
+    virtual LocationError setBlacklistSvSync(const GnssSvIdConfig& config);
+    virtual void setBlacklistSv(const GnssSvIdConfig& config);
+    virtual void getBlacklistSv();
+    virtual void setConstellationControl(const GnssSvTypeConfig& config);
+    virtual void getConstellationControl();
+    virtual void resetConstellationControl();
 };
 
 typedef LocApiBase* (getLocApi_t)(LOC_API_ADAPTER_EVENT_MASK_T exMask,

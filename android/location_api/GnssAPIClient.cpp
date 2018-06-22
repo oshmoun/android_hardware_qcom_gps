@@ -62,11 +62,11 @@ GnssAPIClient::GnssAPIClient(const sp<IGnssCallback>& gpsCb,
     LOC_LOGD("%s]: (%p %p)", __FUNCTION__, &gpsCb, &niCb);
 
     // set default LocationOptions.
-    memset(&mLocationOptions, 0, sizeof(LocationOptions));
-    mLocationOptions.size = sizeof(LocationOptions);
-    mLocationOptions.minInterval = 1000;
-    mLocationOptions.minDistance = 0;
-    mLocationOptions.mode = GNSS_SUPL_MODE_STANDALONE;
+    memset(&mTrackingOptions, 0, sizeof(TrackingOptions));
+    mTrackingOptions.size = sizeof(TrackingOptions);
+    mTrackingOptions.minInterval = 1000;
+    mTrackingOptions.minDistance = 0;
+    mTrackingOptions.mode = GNSS_SUPL_MODE_STANDALONE;
 
     gnssUpdateCallbacks(gpsCb, niCb);
 }
@@ -142,7 +142,7 @@ bool GnssAPIClient::gnssStart()
 {
     LOC_LOGD("%s]: ()", __FUNCTION__);
     bool retVal = true;
-    locAPIStartTracking(mLocationOptions);
+    locAPIStartTracking(mTrackingOptions);
     return retVal;
 }
 
@@ -156,26 +156,32 @@ bool GnssAPIClient::gnssStop()
 
 bool GnssAPIClient::gnssSetPositionMode(IGnss::GnssPositionMode mode,
         IGnss::GnssPositionRecurrence recurrence, uint32_t minIntervalMs,
-        uint32_t preferredAccuracyMeters, uint32_t preferredTimeMs)
+        uint32_t preferredAccuracyMeters, uint32_t preferredTimeMs,
+        GnssPowerMode powerMode, uint32_t timeBetweenMeasurement)
 {
-    LOC_LOGD("%s]: (%d %d %d %d %d)", __FUNCTION__,
-            (int)mode, recurrence, minIntervalMs, preferredAccuracyMeters, preferredTimeMs);
+    LOC_LOGD("%s]: (%d %d %d %d %d %d %d)", __FUNCTION__,
+            (int)mode, recurrence, minIntervalMs, preferredAccuracyMeters,
+            preferredTimeMs, (int)powerMode, timeBetweenMeasurement);
     bool retVal = true;
-    memset(&mLocationOptions, 0, sizeof(LocationOptions));
-    mLocationOptions.size = sizeof(LocationOptions);
-    mLocationOptions.minInterval = minIntervalMs;
-    mLocationOptions.minDistance = preferredAccuracyMeters;
+    memset(&mTrackingOptions, 0, sizeof(TrackingOptions));
+    mTrackingOptions.size = sizeof(TrackingOptions);
+    mTrackingOptions.minInterval = minIntervalMs;
+    mTrackingOptions.minDistance = preferredAccuracyMeters;
     if (mode == IGnss::GnssPositionMode::STANDALONE)
-        mLocationOptions.mode = GNSS_SUPL_MODE_STANDALONE;
+        mTrackingOptions.mode = GNSS_SUPL_MODE_STANDALONE;
     else if (mode == IGnss::GnssPositionMode::MS_BASED)
-        mLocationOptions.mode = GNSS_SUPL_MODE_MSB;
+        mTrackingOptions.mode = GNSS_SUPL_MODE_MSB;
     else if (mode ==  IGnss::GnssPositionMode::MS_ASSISTED)
-        mLocationOptions.mode = GNSS_SUPL_MODE_MSA;
+        mTrackingOptions.mode = GNSS_SUPL_MODE_MSA;
     else {
         LOC_LOGD("%s]: invalid GnssPositionMode: %d", __FUNCTION__, (int)mode);
         retVal = false;
     }
-    locAPIUpdateTrackingOptions(mLocationOptions);
+    if (GNSS_POWER_MODE_INVALID != powerMode) {
+        mTrackingOptions.powerMode = powerMode;
+        mTrackingOptions.tbm = timeBetweenMeasurement;
+    }
+    locAPIUpdateTrackingOptions(mTrackingOptions);
     return retVal;
 }
 
@@ -313,7 +319,10 @@ void GnssAPIClient::onCapabilitiesCb(LocationCapabilitiesMask capabilitiesMask)
     }
     if (gnssCbIface != nullptr) {
         IGnssCallback::GnssSystemInfo gnssInfo;
-        if (capabilitiesMask & LOCATION_CAPABILITIES_DEBUG_NMEA_BIT) {
+        if (capabilitiesMask & LOCATION_CAPABILITIES_CONSTELLATION_ENABLEMENT_BIT ||
+            capabilitiesMask & LOCATION_CAPABILITIES_AGPM_BIT) {
+            gnssInfo.yearOfHw = 2018;
+        } else if (capabilitiesMask & LOCATION_CAPABILITIES_DEBUG_NMEA_BIT) {
             gnssInfo.yearOfHw = 2017;
         } else if (capabilitiesMask & LOCATION_CAPABILITIES_GNSS_MEASUREMENTS_BIT) {
             gnssInfo.yearOfHw = 2016;
@@ -516,6 +525,7 @@ static void convertGnssSvStatus(GnssSvNotification& in, IGnssCallback::GnssSvSta
         info.cN0Dbhz = in.gnssSvs[i].cN0Dbhz;
         info.elevationDegrees = in.gnssSvs[i].elevation;
         info.azimuthDegrees = in.gnssSvs[i].azimuth;
+        info.carrierFrequencyHz = in.gnssSvs[i].carrierFrequencyHz;
         info.svFlag = static_cast<uint8_t>(IGnssCallback::GnssSvFlags::NONE);
         if (in.gnssSvs[i].gnssSvOptionsMask & GNSS_SV_OPTIONS_HAS_EPHEMER_BIT)
             info.svFlag |= IGnssCallback::GnssSvFlags::HAS_EPHEMERIS_DATA;
@@ -523,6 +533,8 @@ static void convertGnssSvStatus(GnssSvNotification& in, IGnssCallback::GnssSvSta
             info.svFlag |= IGnssCallback::GnssSvFlags::HAS_ALMANAC_DATA;
         if (in.gnssSvs[i].gnssSvOptionsMask & GNSS_SV_OPTIONS_USED_IN_FIX_BIT)
             info.svFlag |= IGnssCallback::GnssSvFlags::USED_IN_FIX;
+        if (in.gnssSvs[i].gnssSvOptionsMask & GNSS_SV_OPTIONS_HAS_CARRIER_FREQUENCY_BIT)
+            info.svFlag |= IGnssCallback::GnssSvFlags::HAS_CARRIER_FREQUENCY;
     }
 }
 

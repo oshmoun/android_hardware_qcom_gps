@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -57,6 +57,8 @@ extern "C" {
 /** LocGpsLocation has valid map index */
 #define LOC_GPS_LOCATION_HAS_MAP_INDEX   0x0200
 
+#define GNSS_INVALID_JAMMER_IND 0x7FFFFFFF
+
 /** Sizes for indoor fields */
 #define GPS_LOCATION_MAP_URL_SIZE 400
 #define GPS_LOCATION_MAP_INDEX_SIZE 16
@@ -65,20 +67,16 @@ extern "C" {
 #define ULP_LOCATION_IS_FROM_HYBRID   0x0001
 /** Position source is GNSS only */
 #define ULP_LOCATION_IS_FROM_GNSS     0x0002
-/** Position source is ZPP only */
-#define ULP_LOCATION_IS_FROM_ZPP      0x0004
 /** Position is from a Geofence Breach Event */
-#define ULP_LOCATION_IS_FROM_GEOFENCE 0X0008
+#define ULP_LOCATION_IS_FROM_GEOFENCE 0X0004
 /** Position is from Hardware FLP */
-#define ULP_LOCATION_IS_FROM_HW_FLP   0x0010
+#define ULP_LOCATION_IS_FROM_HW_FLP   0x0008
 /** Position is from NLP */
-#define ULP_LOCATION_IS_FROM_NLP      0x0020
-/** Position is from PIP */
-#define ULP_LOCATION_IS_FROM_PIP      0x0040
+#define ULP_LOCATION_IS_FROM_NLP      0x0010
 /** Position is from external DR solution*/
-#define ULP_LOCATION_IS_FROM_EXT_DR   0X0080
+#define ULP_LOCATION_IS_FROM_EXT_DR   0X0020
 /** Raw GNSS position fixes */
-#define ULP_LOCATION_IS_FROM_GNSS_RAW   0X0100
+#define ULP_LOCATION_IS_FROM_GNSS_RAW   0X0040
 
 typedef uint32_t LocSvInfoSource;
 /** SVinfo source is GNSS/DR */
@@ -94,6 +92,9 @@ typedef uint32_t LocSvInfoSource;
 
 #define LOC_AGPS_CERTIFICATE_MAX_LENGTH 2000
 #define LOC_AGPS_CERTIFICATE_MAX_SLOTS 10
+
+/* TBM Threshold for tracking in background power mode : in millis */
+#define TRACKING_TBM_THRESHOLD_MILLIS 480000
 
 typedef uint32_t LocPosTechMask;
 #define LOC_POS_TECH_MASK_DEFAULT ((LocPosTechMask)0x00000000)
@@ -118,7 +119,10 @@ typedef enum {
     LOC_SUPPORTED_FEATURE_WIFI_AP_DATA_INJECT_2_V02, /**<  Support Wifi AP data inject version 2 feature  */
     LOC_SUPPORTED_FEATURE_DEBUG_NMEA_V02, /**< Support debug NMEA feature */
     LOC_SUPPORTED_FEATURE_GNSS_ONLY_POSITION_REPORT, /**< Support GNSS Only position reports */
-    LOC_SUPPORTED_FEATURE_FDCL /**< Support FDCL */
+    LOC_SUPPORTED_FEATURE_FDCL, /**< Support FDCL */
+    LOC_SUPPORTED_FEATURE_CONSTELLATION_ENABLEMENT_V02, /**< Support constellation enablement */
+    LOC_SUPPORTED_FEATURE_AGPM_V02, /**< Support AGPM feature */
+    LOC_SUPPORTED_FEATURE_XTRA_INTEGRITY /**< Support XTRA integrity */
 } loc_supported_feature_enum;
 
 typedef struct {
@@ -157,6 +161,28 @@ typedef int16_t AGpsBearerType;
 #define AGPS_APN_BEARER_IPV4        1
 #define AGPS_APN_BEARER_IPV6        2
 #define AGPS_APN_BEARER_IPV4V6      3
+
+typedef uint32_t LocApnTypeMask;
+/**<  Denotes APN type for Default/Internet traffic  */
+#define LOC_APN_TYPE_MASK_DEFAULT   ((LocApnTypeMask)0x00000001)
+/**<  Denotes  APN type for IP Multimedia Subsystem  */
+#define LOC_APN_TYPE_MASK_IMS       ((LocApnTypeMask)0x00000002)
+/**<  Denotes APN type for Multimedia Messaging Service  */
+#define LOC_APN_TYPE_MASK_MMS       ((LocApnTypeMask)0x00000004)
+/**<  Denotes APN type for Dial Up Network  */
+#define LOC_APN_TYPE_MASK_DUN       ((LocApnTypeMask)0x00000008)
+/**<  Denotes APN type for Secure User Plane Location  */
+#define LOC_APN_TYPE_MASK_SUPL      ((LocApnTypeMask)0x00000010)
+/**<  Denotes APN type for High Priority Mobile Data  */
+#define LOC_APN_TYPE_MASK_HIPRI     ((LocApnTypeMask)0x00000020)
+/**<  Denotes APN type for over the air administration  */
+#define LOC_APN_TYPE_MASK_FOTA      ((LocApnTypeMask)0x00000040)
+/**<  Denotes APN type for Carrier Branded Services  */
+#define LOC_APN_TYPE_MASK_CBS       ((LocApnTypeMask)0x00000080)
+/**<  Denotes APN type for Initial Attach  */
+#define LOC_APN_TYPE_MASK_IA        ((LocApnTypeMask)0x00000100)
+/**<  Denotes APN type for emergency  */
+#define LOC_APN_TYPE_MASK_EMERGENCY ((LocApnTypeMask)0x00000200)
 
 typedef enum {
     AGPS_CB_PRIORITY_LOW  = 1,
@@ -1446,29 +1472,71 @@ typedef struct
     Gnss_Srn_MacAddr_Type  macAddrType; /* SRN AP MAC Address type */
 } GnssSrnDataReq;
 
+/* Mask indicating enabled or disabled constellations */
+typedef uint64_t GnssSvTypesMask;
+typedef enum {
+    GNSS_SV_TYPES_MASK_GLO_BIT  = (1<<0),
+    GNSS_SV_TYPES_MASK_BDS_BIT  = (1<<1),
+    GNSS_SV_TYPES_MASK_QZSS_BIT = (1<<2),
+    GNSS_SV_TYPES_MASK_GAL_BIT  = (1<<3),
+} GnssSvTypesMaskBits;
+
+/* This SV Type config is injected directly to GNSS Adapter
+ * bypassing Location API */
+typedef struct {
+    size_t size; // set to sizeof(GnssSvTypeConfig)
+    // Enabled Constellations
+    GnssSvTypesMask enabledSvTypesMask;
+    // Disabled Constellations
+    GnssSvTypesMask blacklistedSvTypesMask;
+} GnssSvTypeConfig;
+
+/* Provides the current GNSS SV Type configuration to the client.
+ * This is fetched via direct call to GNSS Adapter bypassing
+ * Location API */
+typedef std::function<void(
+    const GnssSvTypeConfig& config
+)> GnssSvTypeConfigCallback;
+
 /*
  * Represents the status of AGNSS augmented to support IPv4.
  */
 struct AGnssExtStatusIpV4 {
-    AGpsExtType type;
-    LocAGpsStatusValue status;
+    AGpsExtType         type;
+    LocApnTypeMask      apnTypeMask;
+    LocAGpsStatusValue  status;
     /*
      * 32-bit IPv4 address.
      */
-    uint32_t ipV4Addr;
+    uint32_t            ipV4Addr;
 };
 
 /*
  * Represents the status of AGNSS augmented to support IPv6.
  */
 struct AGnssExtStatusIpV6 {
-    AGpsExtType type;
-    LocAGpsStatusValue status;
+    AGpsExtType         type;
+    LocApnTypeMask      apnTypeMask;
+    LocAGpsStatusValue  status;
     /*
      * 128-bit IPv6 address.
      */
-    uint8_t ipV6Addr[16];
+    uint8_t             ipV6Addr[16];
 };
+
+/* ODCPI Request Info */
+enum OdcpiRequestType {
+    ODCPI_REQUEST_TYPE_START,
+    ODCPI_REQUEST_TYPE_STOP
+};
+struct OdcpiRequestInfo {
+    size_t size;
+    OdcpiRequestType type;
+    uint32_t tbfMillis;
+    bool isEmergencyMode;
+};
+/* Callback to send ODCPI request to framework */
+typedef std::function<void(const OdcpiRequestInfo& request)> OdcpiRequestCallback;
 
 /*
  * Callback with AGNSS(IpV4) status information.
@@ -1495,7 +1563,7 @@ typedef void (*LocAgpsCloseResultCb)(bool isSuccess, AGpsExtType agpsType, void*
 #define LOC_IPC_XTRA                   "/dev/socket/location/xtra/socket_xtra"
 
 #define SOCKET_DIR_LOCATION            "/dev/socket/location/"
-#define SOCKET_DIR_EHUB                "/dev/socket/location/ehub"
+#define SOCKET_DIR_EHUB                "/dev/socket/location/ehub/"
 #define SOCKET_TO_LOCATION_HAL_DAEMON  "/dev/socket/location/hal_daemon"
 
 #define SOCKET_DIR_TO_CLIENT           "/dev/socket/loc_client/"

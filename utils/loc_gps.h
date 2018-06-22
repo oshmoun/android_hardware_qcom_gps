@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 The Android Open Source Project
+ * Copyright (C) 2010, 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -100,6 +100,15 @@ typedef uint16_t LocGpsLocationFlags;
 #define LOC_GPS_LOCATION_HAS_ACCURACY   0x0010
 /** LocGpsLocation has valid vertical uncertainity */
 #define LOC_GPS_LOCATION_HAS_VERT_UNCERTAINITY   0x0040
+/** LocGpsLocation has valid spoof mask */
+#define LOC_GPS_LOCATION_HAS_SPOOF_MASK   0x0080
+
+/** Spoof mask in LocGpsLocation */
+typedef uint32_t LocGpsSpoofMask;
+#define LOC_GPS_LOCATION_NONE_SPOOFED            0x0000
+#define LOC_GPS_LOCATION_POSITION_SPOOFED        0x0001
+#define LOC_GPS_LOCATION_TIME_SPOOFED            0x0002
+#define LOC_GPS_LOCATION_NAVIGATION_DATA_SPOOFED 0x0004
 
 /** Flags for the loc_gps_set_capabilities callback. */
 
@@ -142,13 +151,18 @@ typedef uint16_t LocGpsAidingData;
 #define LOC_GPS_DELETE_SVSTEER          0x0100
 #define LOC_GPS_DELETE_SADATA           0x0200
 #define LOC_GPS_DELETE_RTI              0x0400
+#define LOC_GPS_DELETE_MB_DATA          0x0800
 #define LOC_GPS_DELETE_CELLDB_INFO      0x8000
 #define LOC_GPS_DELETE_ALL              0xFFFF
 
 /** AGPS type */
 typedef uint16_t LocAGpsType;
+#define LOC_AGPS_TYPE_ANY           0
 #define LOC_AGPS_TYPE_SUPL          1
 #define LOC_AGPS_TYPE_C2K           2
+#define LOC_AGPS_TYPE_WWAN_ANY      3
+#define LOC_AGPS_TYPE_WIFI          4
+#define LOC_AGPS_TYPE_SUPL_ES       5
 
 typedef uint16_t LocAGpsSetIDType;
 #define LOC_AGPS_SETID_TYPE_NONE    0
@@ -533,6 +547,8 @@ typedef struct {
     size_t          size;
     /** Contains LocGpsLocationFlags bits. */
     uint16_t        flags;
+    /** The spoof mask */
+    LocGpsSpoofMask spoof_mask;
     /** Represents latitude in degrees. */
     double          latitude;
     /** Represents longitude in degrees. */

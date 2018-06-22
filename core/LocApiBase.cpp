@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, 2016-2017 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, 2016-2018 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -107,19 +107,16 @@ struct LocSsrMsg : public LocMsg {
 
 struct LocOpenMsg : public LocMsg {
     LocApiBase* mLocApi;
-    LOC_API_ADAPTER_EVENT_MASK_T mMask;
-    inline LocOpenMsg(LocApiBase* locApi,
-                      LOC_API_ADAPTER_EVENT_MASK_T mask) :
-        LocMsg(), mLocApi(locApi), mMask(mask)
+    inline LocOpenMsg(LocApiBase* locApi) :
+            LocMsg(), mLocApi(locApi)
     {
         locallog();
     }
     inline virtual void proc() const {
-        mLocApi->open(mMask);
+        mLocApi->open(mLocApi->getEvtMask());
     }
     inline void locallog() const {
-        LOC_LOGV("%s:%d]: LocOpen Mask: %" PRIu64 "\n",
-                 __func__, __LINE__, mMask);
+        LOC_LOGv("LocOpen Mask: %" PRIx64 "\n", mLocApi->getEvtMask());
     }
     inline virtual void log() const {
         locallog();
@@ -137,7 +134,6 @@ struct LocCloseMsg : public LocMsg {
         mLocApi->close();
     }
     inline void locallog() const {
-        LOC_LOGV("%s]: LocCloseMsg");
     }
     inline virtual void log() const {
         locallog();
@@ -167,6 +163,18 @@ LOC_API_ADAPTER_EVENT_MASK_T LocApiBase::getEvtMask()
     return mask & ~mExcludedMask;
 }
 
+bool LocApiBase::isMaster()
+{
+    bool isMaster = false;
+
+    for (int i = 0;
+            !isMaster && i < MAX_ADAPTERS && NULL != mLocAdapters[i];
+            i++) {
+        isMaster |= mLocAdapters[i]->isAdapterMaster();
+    }
+    return isMaster;
+}
+
 bool LocApiBase::isInSession()
 {
     bool inSession = false;
@@ -185,8 +193,7 @@ void LocApiBase::addAdapter(LocAdapterBase* adapter)
     for (int i = 0; i < MAX_ADAPTERS && mLocAdapters[i] != adapter; i++) {
         if (mLocAdapters[i] == NULL) {
             mLocAdapters[i] = adapter;
-            mMsgTask->sendMsg(new LocOpenMsg(this,
-                    mMask | adapter->getEvtMask()));
+            mMsgTask->sendMsg(new LocOpenMsg(this));
             break;
         }
     }
@@ -222,7 +229,7 @@ void LocApiBase::removeAdapter(LocAdapterBase* adapter)
                 mMsgTask->sendMsg(new LocCloseMsg(this));
             } else {
                 // else we need to remove the bit
-                mMsgTask->sendMsg(new LocOpenMsg(this, getEvtMask()));
+                mMsgTask->sendMsg(new LocOpenMsg(this));
             }
         }
     }
@@ -230,7 +237,7 @@ void LocApiBase::removeAdapter(LocAdapterBase* adapter)
 
 void LocApiBase::updateEvtMask()
 {
-    mMsgTask->sendMsg(new LocOpenMsg(this, getEvtMask()));
+    mMsgTask->sendMsg(new LocOpenMsg(this));
 }
 
 void LocApiBase::handleEngineUpEvent()
@@ -292,6 +299,11 @@ void LocApiBase::reportZppBestAvailableFix(LocGpsLocation &zppLoc,
             location_extended, tech_mask));
 }
 
+void LocApiBase::requestOdcpi(OdcpiRequestInfo& request)
+{
+    // loop through adapters, and deliver to the first handling adapter.
+    TO_1ST_HANDLING_LOCADAPTERS(mLocAdapters[i]->requestOdcpiEvent(request));
+}
 
 void LocApiBase::reportSv(GnssSvNotification& svNotify)
 {
@@ -308,7 +320,7 @@ void LocApiBase::reportSv(GnssSvNotification& svNotify)
             sizeof(constellationString) / sizeof(constellationString[0]) - 1) {
             svNotify.gnssSvs[i].type = GNSS_SV_TYPE_UNKNOWN;
         }
-        LOC_LOGV("   %03zu: %*s  %02d    %f    %f    %f   0x%02X",
+        LOC_LOGV("   %03zu: %*s  %02d    %f    %f    %f    %f    0x%02X",
             i,
             13,
             constellationString[svNotify.gnssSvs[i].type],
@@ -316,6 +328,7 @@ void LocApiBase::reportSv(GnssSvNotification& svNotify)
             svNotify.gnssSvs[i].cN0Dbhz,
             svNotify.gnssSvs[i].elevation,
             svNotify.gnssSvs[i].azimuth,
+            svNotify.gnssSvs[i].carrierFrequencyHz,
             svNotify.gnssSvs[i].gnssSvOptionsMask);
     }
     // loop through adapters, and deliver to all adapters.
@@ -378,34 +391,18 @@ void LocApiBase::requestLocation()
     TO_1ST_HANDLING_LOCADAPTERS(mLocAdapters[i]->requestLocation());
 }
 
-void LocApiBase::requestATL(int connHandle, LocAGpsType agps_type)
+void LocApiBase::requestATL(int connHandle, LocAGpsType agps_type,
+                            LocApnTypeMask apn_type_mask)
 {
     // loop through adapters, and deliver to the first handling adapter.
-    TO_1ST_HANDLING_LOCADAPTERS(mLocAdapters[i]->requestATL(connHandle, agps_type));
+    TO_1ST_HANDLING_LOCADAPTERS(
+            mLocAdapters[i]->requestATL(connHandle, agps_type, apn_type_mask));
 }
 
 void LocApiBase::releaseATL(int connHandle)
 {
     // loop through adapters, and deliver to the first handling adapter.
     TO_1ST_HANDLING_LOCADAPTERS(mLocAdapters[i]->releaseATL(connHandle));
-}
-
-void LocApiBase::requestSuplES(int connHandle)
-{
-    // loop through adapters, and deliver to the first handling adapter.
-    TO_1ST_HANDLING_LOCADAPTERS(mLocAdapters[i]->requestSuplES(connHandle));
-}
-
-void LocApiBase::reportDataCallOpened()
-{
-    // loop through adapters, and deliver to the first handling adapter.
-    TO_1ST_HANDLING_LOCADAPTERS(mLocAdapters[i]->reportDataCallOpened());
-}
-
-void LocApiBase::reportDataCallClosed()
-{
-    // loop through adapters, and deliver to the first handling adapter.
-    TO_1ST_HANDLING_LOCADAPTERS(mLocAdapters[i]->reportDataCallClosed());
 }
 
 void LocApiBase::requestNiNotify(GnssNiNotification &notify, const void* data)
@@ -425,6 +422,28 @@ void LocApiBase::reportGnssMeasurementData(GnssMeasurementsNotification& measure
 {
     // loop through adapters, and deliver to all adapters.
     TO_ALL_LOCADAPTERS(mLocAdapters[i]->reportGnssMeasurementDataEvent(measurements, msInWeek));
+}
+
+void LocApiBase::reportGnssSvIdConfig(const GnssSvIdConfig& config)
+{
+    // Print the config
+    LOC_LOGv("gloBlacklistSvMask: %" PRIu64 ", bdsBlacklistSvMask: %" PRIu64 ",\n"
+             "qzssBlacklistSvMask: %" PRIu64 ", galBlacklistSvMask: %" PRIu64,
+             config.gloBlacklistSvMask, config.bdsBlacklistSvMask,
+             config.qzssBlacklistSvMask, config.galBlacklistSvMask);
+
+    // Loop through adapters, and deliver to all adapters.
+    TO_ALL_LOCADAPTERS(mLocAdapters[i]->reportGnssSvIdConfigEvent(config));
+}
+
+void LocApiBase::reportGnssSvTypeConfig(const GnssSvTypeConfig& config)
+{
+    // Print the config
+    LOC_LOGv("blacklistedMask: %" PRIu64 ", enabledMask: %" PRIu64,
+             config.blacklistedSvTypesMask, config.enabledSvTypesMask);
+
+    // Loop through adapters, and deliver to all adapters.
+    TO_ALL_LOCADAPTERS(mLocAdapters[i]->reportGnssSvTypeConfigEvent(config));
 }
 
 enum loc_api_adapter_err LocApiBase::
@@ -450,6 +469,10 @@ void LocApiBase::
 DEFAULT_IMPL()
 
 void LocApiBase::
+    injectPosition(const Location& /*location*/, bool /*onDemandCpi*/)
+DEFAULT_IMPL()
+
+void LocApiBase::
     setTime(LocGpsUtcTime /*time*/, int64_t /*timeReference*/, int /*uncertainty*/)
 DEFAULT_IMPL()
 
@@ -459,7 +482,8 @@ DEFAULT_IMPL(LOC_API_ADAPTER_ERR_SUCCESS)
 
 void LocApiBase::
    atlOpenStatus(int /*handle*/, int /*is_succ*/, char* /*apn*/, uint32_t /*apnLen*/,
-                 AGpsBearerType /*bear*/, LocAGpsType /*agpsType*/)
+                 AGpsBearerType /*bear*/, LocAGpsType /*agpsType*/,
+                 LocApnTypeMask /*mask*/)
 DEFAULT_IMPL()
 
 void LocApiBase::
@@ -549,32 +573,12 @@ DEFAULT_IMPL(0)
 GnssConfigLppeUserPlaneMask LocApiBase::convertLppeUp(const uint32_t /*lppeUserPlaneMask*/)
 DEFAULT_IMPL(0)
 
-enum loc_api_adapter_err LocApiBase::
+void LocApiBase::
    getWwanZppFix()
-DEFAULT_IMPL(LOC_API_ADAPTER_ERR_SUCCESS)
+DEFAULT_IMPL()
 
 void LocApiBase::
    getBestAvailableZppFix()
-DEFAULT_IMPL()
-
-int LocApiBase::
-    initDataServiceClient(bool /*isDueToSsr*/)
-DEFAULT_IMPL(-1)
-
-int LocApiBase::
-    openAndStartDataCall()
-DEFAULT_IMPL(-1)
-
-void LocApiBase::
-    stopDataCall()
-DEFAULT_IMPL()
-
-void LocApiBase::
-    closeDataCall()
-DEFAULT_IMPL()
-
-void LocApiBase::
-    releaseDataServiceClient()
 DEFAULT_IMPL()
 
 LocationError LocApiBase::
@@ -587,12 +591,26 @@ void LocApiBase::
                     uint32_t /*slotBitMask*/)
 DEFAULT_IMPL()
 
-int LocApiBase::
-    getGpsLock()
-DEFAULT_IMPL(-1)
-
 LocationError LocApiBase::
     setXtraVersionCheckSync(uint32_t /*check*/)
 DEFAULT_IMPL(LOCATION_ERROR_SUCCESS)
+
+LocationError LocApiBase::setBlacklistSvSync(const GnssSvIdConfig& /*config*/)
+DEFAULT_IMPL(LOCATION_ERROR_SUCCESS)
+
+void LocApiBase::setBlacklistSv(const GnssSvIdConfig& /*config*/)
+DEFAULT_IMPL()
+
+void LocApiBase::getBlacklistSv()
+DEFAULT_IMPL()
+
+void LocApiBase::setConstellationControl(const GnssSvTypeConfig& /*config*/)
+DEFAULT_IMPL()
+
+void LocApiBase::getConstellationControl()
+DEFAULT_IMPL()
+
+void LocApiBase::resetConstellationControl()
+DEFAULT_IMPL()
 
 } // namespace loc_core
