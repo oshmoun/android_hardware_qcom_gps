@@ -76,6 +76,19 @@ typedef struct {
     uint32_t svIdOffset;
 } NmeaSvMeta;
 
+typedef struct {
+    double latitude;
+    double longitude;
+    float  accuracy;
+    // the CPI will be blocked until the boot time
+    // specified in blockedTillTsMs
+    int64_t blockedTillTsMs;
+    // CPIs whose both latitude and longitude differ
+    // no more than latLonThreshold will be blocked
+    // in units of degree
+    double latLonDiffThreshold;
+} BlockCPIInfo;
+
 using namespace loc_core;
 
 namespace loc_core {
@@ -122,7 +135,11 @@ class GnssAdapter : public LocAdapterBase {
     /* === SystemStatus ===================================================================== */
     SystemStatus* mSystemStatus;
     std::string mServerUrl;
+    std::string mMoServerUrl;
     XtraSystemStatusObserver mXtraObserver;
+
+    /* === Misc ===================================================================== */
+    BlockCPIInfo mBlockCPIInfo;
 
     /*==== CONVERSION ===================================================================*/
     static void convertOptions(LocPosMode& out, const TrackingOptions& trackingOptions);
@@ -160,7 +177,7 @@ public:
     LocationCallbacks getClientCallbacks(LocationAPI* client);
     LocationCapabilitiesMask getCapabilities();
     void broadcastCapabilities(LocationCapabilitiesMask);
-    void setSuplHostServer(const char* server, int port);
+    void setSuplHostServer(const char* server, int port, LocServerType type);
 
     /* ==== TRACKING ======================================================================= */
     /* ======== COMMANDS ====(Called from Client Thread)==================================== */
@@ -310,7 +327,7 @@ public:
     /*==== SYSTEM STATUS ================================================================*/
     inline SystemStatus* getSystemStatus(void) { return mSystemStatus; }
     std::string& getServerUrl(void) { return mServerUrl; }
-    void setServerUrl(const char* server) { mServerUrl.assign(server); }
+    std::string& getMoServerUrl(void) { return mMoServerUrl; }
 
     /*==== CONVERSION ===================================================================*/
     static uint32_t convertGpsLock(const GnssConfigGpsLock gpsLock);
@@ -326,7 +343,7 @@ public:
     static void convertSatelliteInfo(std::vector<GnssDebugSatelliteInfo>& out,
                                      const GnssSvType& in_constellation,
                                      const SystemStatusReports& in);
-    static void convertToGnssSvIdConfig(
+    static bool convertToGnssSvIdConfig(
             const std::vector<GnssSvIdSource>& blacklistedSvIds, GnssSvIdConfig& config);
     static void convertFromGnssSvIdConfig(
             const GnssSvIdConfig& svConfig, GnssConfig& config);
@@ -336,6 +353,8 @@ public:
 
     void injectLocationCommand(double latitude, double longitude, float accuracy);
     void injectTimeCommand(int64_t time, int64_t timeReference, int32_t uncertainty);
+    void blockCPICommand(double latitude, double longitude, float accuracy,
+                         int blockDurationMsec, double latLonDiffThreshold);
 };
 
 #endif //GNSS_ADAPTER_H
