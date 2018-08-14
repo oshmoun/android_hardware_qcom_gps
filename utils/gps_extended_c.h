@@ -122,7 +122,8 @@ typedef enum {
     LOC_SUPPORTED_FEATURE_FDCL, /**< Support FDCL */
     LOC_SUPPORTED_FEATURE_CONSTELLATION_ENABLEMENT_V02, /**< Support constellation enablement */
     LOC_SUPPORTED_FEATURE_AGPM_V02, /**< Support AGPM feature */
-    LOC_SUPPORTED_FEATURE_XTRA_INTEGRITY /**< Support XTRA integrity */
+    LOC_SUPPORTED_FEATURE_XTRA_INTEGRITY, /**< Support XTRA integrity */
+    LOC_SUPPORTED_FEATURE_FDCL_2 /**< Support FDCL V2 */
 } loc_supported_feature_enum;
 
 typedef struct {
@@ -391,6 +392,16 @@ typedef uint32_t LocPosDataMask;
 #define LOC_NAV_DATA_HAS_YAW_RATE ((LocPosDataMask)0x0008)
 /* Bitmask to specify whether Navigation data has Body pitch */
 #define LOC_NAV_DATA_HAS_PITCH ((LocPosDataMask)0x0010)
+/* Bitmask to specify whether Navigation data has Forward Acceleration Unc  */
+#define LOC_NAV_DATA_HAS_LONG_ACCEL_UNC ((LocPosDataMask)0x0020)
+/* Bitmask to specify whether Navigation data has Sideward Acceleration Unc*/
+#define LOC_NAV_DATA_HAS_LAT_ACCEL_UNC ((LocPosDataMask)0x0040)
+/* Bitmask to specify whether Navigation data has Vertical Acceleration Unc*/
+#define LOC_NAV_DATA_HAS_VERT_ACCEL_UNC ((LocPosDataMask)0x0080)
+/* Bitmask to specify whether Navigation data has Heading Rate Unc*/
+#define LOC_NAV_DATA_HAS_YAW_RATE_UNC ((LocPosDataMask)0x0100)
+/* Bitmask to specify whether Navigation data has Body pitch Unc*/
+#define LOC_NAV_DATA_HAS_PITCH_UNC ((LocPosDataMask)0x0200)
 
 /** GPS PRN Range */
 #define GPS_SV_PRN_MIN      1
@@ -444,14 +455,24 @@ typedef struct {
    uint32_t        bodyFrameDatamask;
    /* Forward Acceleration in body frame (m/s2)*/
    float           longAccel;
+   /** Uncertainty of Forward Acceleration in body frame */
+   float           longAccelUnc;
    /* Sideward Acceleration in body frame (m/s2)*/
    float           latAccel;
+   /** Uncertainty of Side-ward Acceleration in body frame */
+   float           latAccelUnc;
    /* Vertical Acceleration in body frame (m/s2)*/
    float           vertAccel;
+   /** Uncertainty of Vertical Acceleration in body frame */
+   float           vertAccelUnc;
    /* Heading Rate (Radians/second) */
    float           yawRate;
+   /** Uncertainty of Heading Rate */
+   float           yawRateUnc;
    /* Body pitch (Radians) */
    float           pitch;
+   /** Uncertainty of Body pitch */
+   float           pitchRadUnc;
 }LocPositionDynamics;
 
 typedef struct {
@@ -643,7 +664,7 @@ typedef struct {
     /** SV Info source used in computing this fix */
     LocSvInfoSource sv_source;
     /** Body Frame Dynamics: 4wayAcceleration and pitch set with validity */
-    LocPositionDynamics bodyFrameData;
+    GnssLocationPositionDynamics bodyFrameData;
     /** GPS Time */
     GPSTimeStruct gpsTime;
     GnssSystemTime gnssSystemTime;
@@ -807,6 +828,7 @@ enum loc_api_adapter_event_index {
     LOC_API_ADAPTER_BATCH_STATUS,                      // batch status
     LOC_API_ADAPTER_FDCL_SERVICE_REQ,                  // FDCL service request
     LOC_API_ADAPTER_REPORT_UNPROPAGATED_POSITION,      // Unpropagated Position report
+    LOC_API_ADAPTER_BS_OBS_DATA_SERVICE_REQ,           // BS observation data request
     LOC_API_ADAPTER_EVENT_MAX
 };
 
@@ -844,6 +866,7 @@ enum loc_api_adapter_event_index {
 #define LOC_API_ADAPTER_BIT_BATCH_STATUS                     (1<<LOC_API_ADAPTER_BATCH_STATUS)
 #define LOC_API_ADAPTER_BIT_FDCL_SERVICE_REQ                 (1ULL<<LOC_API_ADAPTER_FDCL_SERVICE_REQ)
 #define LOC_API_ADAPTER_BIT_PARSED_UNPROPAGATED_POSITION_REPORT (1ULL<<LOC_API_ADAPTER_REPORT_UNPROPAGATED_POSITION)
+#define LOC_API_ADAPTER_BIT_BS_OBS_DATA_SERVICE_REQ          (1ULL<<LOC_API_ADAPTER_BS_OBS_DATA_SERVICE_REQ)
 
 typedef uint64_t LOC_API_ADAPTER_EVENT_MASK_T;
 
