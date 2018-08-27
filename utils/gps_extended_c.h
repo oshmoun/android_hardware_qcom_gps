@@ -363,7 +363,8 @@ typedef uint64_t GpsLocationExtendedFlags;
 #define GPS_LOCATION_EXTENDED_HAS_LEAP_SECONDS   0x80000000
 /** GpsLocationExtended has time uncertainty **/
 #define GPS_LOCATION_EXTENDED_HAS_TIME_UNC   0x100000000
-
+/** GpsLocationExtended has heading rate  **/
+#define GPS_LOCATION_EXTENDED_HAS_HEADING_RATE 0x200000000
 
 typedef uint32_t LocNavSolutionMask;
 /* Bitmask to specify whether SBAS ionospheric correction is used  */
@@ -717,6 +718,10 @@ typedef struct {
     uint8_t leapSeconds;
     /** Time uncertainty in milliseconds   */
     float timeUncMs;
+    /** Heading Rate is in NED frame.
+        Range: 0 to 359.999. 946
+        Unit: Degrees per Seconds */
+    float headingRateDeg;
 } GpsLocationExtended;
 
 enum loc_sess_status {
@@ -1403,6 +1408,8 @@ typedef struct
     /*  Extended Time Information - Cumulative Number of Clock Resets */
     uint8_t numClockResets_valid;  /**< Must be set to true if numClockResets is being passed */
     uint32_t numClockResets;
+    bool                                     gnssSignalTypeMaskValid;
+    GnssSignalTypeMask                       gnssSignalTypeMask;
 
 } GnssSvMeasurementSet;
 
