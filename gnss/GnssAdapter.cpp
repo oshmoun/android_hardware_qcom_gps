@@ -629,10 +629,7 @@ GnssAdapter::setSuplHostServer(const char* server, int port, LocServerType type)
                 url.assign(serverUrl);
 
                 if (LOC_AGPS_SUPL_SERVER == type) {
-                    int nCharsToCopy = strlen(server) < MAX_SUPL_SERVER_URL_LENGTH ?
-                            strlen(server) : (MAX_SUPL_SERVER_URL_LENGTH - 1);
-                    strlcpy(ContextBase::mGps_conf.SUPL_HOST, server, nCharsToCopy);
-                    ContextBase::mGps_conf.SUPL_HOST[nCharsToCopy] = '\0';
+                    strlcpy(ContextBase::mGps_conf.SUPL_HOST, server, LOC_MAX_PARAM_STRING);
                     ContextBase::mGps_conf.SUPL_PORT = port;
                 }
 
@@ -1504,17 +1501,29 @@ GnssAdapter::gnssUpdateSvTypeConfigCommand(GnssSvTypeConfig config)
 void
 GnssAdapter::gnssSvTypeConfigUpdate(const GnssSvTypeConfig& config)
 {
+    // Gather bits removed from enabled mask
+    GnssSvTypesMask enabledRemoved = mGnssSvTypeConfig.enabledSvTypesMask &
+            (mGnssSvTypeConfig.enabledSvTypesMask ^ config.enabledSvTypesMask);
+    // Send reset if any constellation is removed from the enabled list
+    bool sendReset = (enabledRemoved != 0);
+    // Save new config and update
     gnssSetSvTypeConfig(config);
-    gnssSvTypeConfigUpdate();
+    gnssSvTypeConfigUpdate(sendReset);
 }
 
 void
-GnssAdapter::gnssSvTypeConfigUpdate()
+GnssAdapter::gnssSvTypeConfigUpdate(bool sendReset)
 {
-    LOC_LOGd("constellations blacklisted 0x%" PRIx64 ", enabled 0x%" PRIx64,
-             mGnssSvTypeConfig.blacklistedSvTypesMask, mGnssSvTypeConfig.enabledSvTypesMask);
+    LOC_LOGd("constellations blacklisted 0x%" PRIx64 ", enabled 0x%" PRIx64 ", sendReset %d",
+             mGnssSvTypeConfig.blacklistedSvTypesMask, mGnssSvTypeConfig.enabledSvTypesMask,
+             sendReset);
 
     if (mGnssSvTypeConfig.size == sizeof(mGnssSvTypeConfig)) {
+
+        if (sendReset) {
+            mLocApi->resetConstellationControl();
+        }
+
         GnssSvIdConfig blacklistConfig = {};
         // Revert to previously blacklisted SVs for each enabled constellation
         blacklistConfig = mGnssSvIdConfig;
@@ -2271,6 +2280,7 @@ GnssAdapter::startTrackingMultiplex(LocationAPI* client, uint32_t sessionId,
         // find the smallest interval and powerMode
         TrackingOptions multiplexedOptions = {}; // size is 0 until set for the first time
         GnssPowerMode multiplexedPowerMode = GNSS_POWER_MODE_INVALID;
+        memset(&multiplexedOptions, 0, sizeof(multiplexedOptions));
         for (auto it = mTrackingSessions.begin(); it != mTrackingSessions.end(); ++it) {
             // if not set or there is a new smallest interval, then set the new interval
             if (0 == multiplexedOptions.size ||
@@ -2461,6 +2471,7 @@ GnssAdapter::updateTrackingMultiplex(LocationAPI* client, uint32_t id,
         // find the smallest interval and powerMode, other than the session we are updating
         TrackingOptions multiplexedOptions = {}; // size is 0 until set for the first time
         GnssPowerMode multiplexedPowerMode = GNSS_POWER_MODE_INVALID;
+        memset(&multiplexedOptions, 0, sizeof(multiplexedOptions));
         for (auto it2 = mTrackingSessions.begin(); it2 != mTrackingSessions.end(); ++it2) {
             // if session is not the one we are updating and either interval
             // is not set or there is a new smallest interval, then set the new interval
@@ -2560,6 +2571,7 @@ GnssAdapter::stopTrackingMultiplex(LocationAPI* client, uint32_t id)
             // find the smallest interval and powerMode, other than the session we are stopping
             TrackingOptions multiplexedOptions = {}; // size is 0 until set for the first time
             GnssPowerMode multiplexedPowerMode = GNSS_POWER_MODE_INVALID;
+            memset(&multiplexedOptions, 0, sizeof(multiplexedOptions));
             for (auto it2 = mTrackingSessions.begin(); it2 != mTrackingSessions.end(); ++it2) {
                 // if session is not the one we are stopping and either interval
                 // is not set or there is a new smallest interval, then set the new interval
@@ -2864,6 +2876,7 @@ GnssAdapter::reportPositionEvent(const UlpLocation& ulpLocation,
             mStatus(status),
             mTechMask(techMask),
             mMsInWeek(msInWeek) {
+                memset(&mDataNotify, 0, sizeof(mDataNotify));
                 if (pDataNotify != nullptr) {
                     mDataNotify = *pDataNotify;
                     mbIsDataValid = true;
@@ -2904,25 +2917,9 @@ GnssAdapter::needReport(const UlpLocation& ulpLocation,
     // then always output position reported by engine hub to requesting client
     if (true == initEngHubProxy()) {
         reported = true;
-    } else if (LOC_SESS_SUCCESS == status) {
-        // this is a final fix
-        LocPosTechMask mask =
-                LOC_POS_TECH_MASK_SATELLITE | LOC_POS_TECH_MASK_SENSORS | LOC_POS_TECH_MASK_HYBRID;
-        // it is a Satellite fix or a sensor fix
-        reported = (mask & techMask);
-    } else if (LOC_SESS_INTERMEDIATE == status &&
-            LOC_SESS_INTERMEDIATE == ContextBase::mGps_conf.INTERMEDIATE_POS) {
-        // this is a intermediate fix and we accepte intermediate
-
-        // it is NOT the case that
-        // there is inaccuracy; and
-        // we care about inaccuracy; and
-        // the inaccuracy exceeds our tolerance
-        reported = !((ulpLocation.gpsLocation.flags & LOC_GPS_LOCATION_HAS_ACCURACY) &&
-                (ContextBase::mGps_conf.ACCURACY_THRES != 0) &&
-                (ulpLocation.gpsLocation.accuracy > ContextBase::mGps_conf.ACCURACY_THRES));
+    } else {
+        reported = LocApiBase::needReport(ulpLocation, status, techMask);
     }
-
     return reported;
 }
 
