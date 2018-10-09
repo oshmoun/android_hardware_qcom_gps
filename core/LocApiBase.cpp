@@ -362,6 +362,19 @@ void LocApiBase::requestOdcpi(OdcpiRequestInfo& request)
     TO_1ST_HANDLING_LOCADAPTERS(mLocAdapters[i]->requestOdcpiEvent(request));
 }
 
+void LocApiBase::reportGnssEngEnergyConsumedEvent(uint64_t energyConsumedSinceFirstBoot)
+{
+    // loop through adapters, and deliver to the first handling adapter.
+    TO_ALL_LOCADAPTERS(mLocAdapters[i]->reportGnssEngEnergyConsumedEvent(
+            energyConsumedSinceFirstBoot));
+}
+
+void LocApiBase::reportDeleteAidingDataEvent(GnssAidingData& aidingData) {
+    // loop through adapters, and deliver to the first handling adapter.
+    TO_1ST_HANDLING_LOCADAPTERS(mLocAdapters[i]->reportDeleteAidingDataEvent(aidingData));
+}
+
+
 void LocApiBase::reportSv(GnssSvNotification& svNotify)
 {
     const char* constellationString[] = { "Unknown", "GPS", "SBAS", "GLONASS",
@@ -411,6 +424,14 @@ void LocApiBase::reportSvPolynomial(GnssSvPolynomial &svPolynomial)
     // loop through adapters, and deliver to all adapters.
     TO_ALL_LOCADAPTERS(
         mLocAdapters[i]->reportSvPolynomialEvent(svPolynomial)
+    );
+}
+
+void LocApiBase::reportSvEphemeris(GnssSvEphemerisReport & svEphemeris)
+{
+    // loop through adapters, and deliver to all adapters.
+    TO_ALL_LOCADAPTERS(
+        mLocAdapters[i]->reportSvEphemerisEvent(svEphemeris)
     );
 }
 
@@ -540,6 +561,10 @@ void LocApiBase::
 DEFAULT_IMPL()
 
 void LocApiBase::
+    injectPosition(const GnssLocationInfoNotification & /*locationInfo*/, bool /*onDemandCpi*/)
+DEFAULT_IMPL()
+
+void LocApiBase::
     setTime(LocGpsUtcTime /*time*/, int64_t /*timeReference*/, int /*uncertainty*/)
 DEFAULT_IMPL()
 
@@ -649,6 +674,10 @@ LocationError LocApiBase::
 DEFAULT_IMPL(LOCATION_ERROR_SUCCESS)
 
 void LocApiBase::
+    requestForAidingData(GnssAidingDataSvMask /*svDataMask*/)
+DEFAULT_IMPL()
+
+void LocApiBase::
     installAGpsCert(const LocDerEncodedCertificate* /*pData*/,
                     size_t /*length*/,
                     uint32_t /*slotBitMask*/)
@@ -676,4 +705,17 @@ DEFAULT_IMPL()
 void LocApiBase::resetConstellationControl()
 DEFAULT_IMPL()
 
+LocationError LocApiBase::
+    setConstrainedTuncMode(bool /*enabled*/,
+                           float /*tuncConstraint*/,
+                           uint32_t /*energyBudget*/)
+DEFAULT_IMPL(LOCATION_ERROR_SUCCESS)
+
+LocationError LocApiBase::
+    setPositionAssistedClockEstimatorMode(bool /*enabled*/)
+DEFAULT_IMPL(LOCATION_ERROR_SUCCESS)
+
+LocationError LocApiBase::
+    getGnssEnergyConsumed()
+DEFAULT_IMPL(LOCATION_ERROR_SUCCESS)
 } // namespace loc_core

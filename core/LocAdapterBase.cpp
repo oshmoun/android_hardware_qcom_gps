@@ -108,6 +108,11 @@ void LocAdapterBase::
 DEFAULT_IMPL()
 
 void LocAdapterBase::
+    reportSvEphemerisEvent(GnssSvEphemerisReport &/*svEphemeris*/)
+DEFAULT_IMPL()
+
+
+void LocAdapterBase::
     reportStatus(LocGpsStatusValue /*status*/)
 DEFAULT_IMPL()
 
@@ -175,4 +180,11 @@ bool LocAdapterBase::
     requestOdcpiEvent(OdcpiRequestInfo& /*request*/)
 DEFAULT_IMPL(false)
 
+bool LocAdapterBase::
+    reportGnssEngEnergyConsumedEvent(uint64_t /*energyConsumedSinceFirstBoot*/)
+DEFAULT_IMPL(false)
+
+bool LocAdapterBase::
+    reportDeleteAidingDataEvent(GnssAidingData & /*aidingData*/)
+DEFAULT_IMPL(false)
 } // namespace loc_core
