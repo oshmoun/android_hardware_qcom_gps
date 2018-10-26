@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, 2016-2018 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, 2016-2017 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -62,7 +62,6 @@ class LocAdapterProxyBase;
 class LocAdapterBase {
 private:
     static uint32_t mSessionIdCounter;
-    const bool mIsMaster;
 protected:
     LOC_API_ADAPTER_EVENT_MASK_T mEvtMask;
     ContextBase* mContext;
@@ -70,18 +69,12 @@ protected:
     LocAdapterProxyBase* mLocAdapterProxyBase;
     const MsgTask* mMsgTask;
     inline LocAdapterBase(const MsgTask* msgTask) :
-        mIsMaster(false), mEvtMask(0), mContext(NULL), mLocApi(NULL),
+        mEvtMask(0), mContext(NULL), mLocApi(NULL),
         mLocAdapterProxyBase(NULL), mMsgTask(msgTask) {}
-    LocAdapterBase(const LOC_API_ADAPTER_EVENT_MASK_T mask,
-        ContextBase* context, bool isMaster,
-        LocAdapterProxyBase *adapterProxyBase = NULL);
 public:
     inline virtual ~LocAdapterBase() { mLocApi->removeAdapter(this); }
-    inline LocAdapterBase(const LOC_API_ADAPTER_EVENT_MASK_T mask,
-                          ContextBase* context,
-                          LocAdapterProxyBase *adapterProxyBase = NULL) :
-        LocAdapterBase(mask, context, false, adapterProxyBase) {}
-
+    LocAdapterBase(const LOC_API_ADAPTER_EVENT_MASK_T mask,
+                   ContextBase* context, LocAdapterProxyBase *adapterProxyBase = NULL);
     inline LOC_API_ADAPTER_EVENT_MASK_T
         checkMask(LOC_API_ADAPTER_EVENT_MASK_T mask) const {
         return mEvtMask & mask;
@@ -121,10 +114,6 @@ public:
     }
 
     uint32_t generateSessionId();
-
-    inline bool isAdapterMaster() {
-        return mIsMaster;
-    }
 
     // This will be overridden by the individual adapters
     // if necessary.

@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, 2016-2018 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, 2016-2017 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -98,7 +98,6 @@ protected:
     inline virtual ~LocApiBase() { close(); }
     bool isInSession();
     const LOC_API_ADAPTER_EVENT_MASK_T mExcludedMask;
-    bool isMaster();
 
 public:
     inline void sendMsg(const LocMsg* msg) const {
@@ -249,7 +248,7 @@ public:
       Current value of GPS Lock on success
       -1 on failure
      */
-    virtual int getGpsLock(uint8_t subType);
+    virtual int getGpsLock(void);
 
     virtual LocationError setXtraVersionCheck(uint32_t check);
     /*

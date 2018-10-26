@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -63,7 +63,7 @@ GnssAdapter::GnssAdapter() :
                    LocDualContext::getLocFgContext(NULL,
                                                    NULL,
                                                    LocDualContext::mLocationHalName,
-                                                   false), true, nullptr),
+                                                   false)),
     mUlpProxy(new UlpProxyBase()),
     mUlpPositionMode(),
     mGnssSvIdUsedInPosition(),
@@ -768,10 +768,6 @@ GnssAdapter::gnssUpdateConfigCommand(GnssConfig config)
             if (mConfig.flags & GNSS_CONFIG_FLAGS_GPS_LOCK_VALID_BIT) {
                 uint32_t newGpsLock = mAdapter.convertGpsLock(mConfig.gpsLock);
                 ContextBase::mGps_conf.GPS_LOCK = newGpsLock;
-                if (0 == ContextBase::mGps_conf.GPS_LOCK) {
-                    // we should minimally lock MO
-                    ContextBase::mGps_conf.GPS_LOCK = 1;
-                }
                 if (0 == mAdapter.getPowerVoteId()) {
                     err = mApi.setGpsLock(mConfig.gpsLock);
                 }
