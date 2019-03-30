@@ -428,37 +428,7 @@ GnssAdapter::convertLocationInfo(GnssLocationInfoNotification& out,
     }
 }
 
-inline uint32_t
-GnssAdapter::convertGpsLock(const GnssConfigGpsLock gpsLock)
-{
-    switch (gpsLock) {
-        case GNSS_CONFIG_GPS_LOCK_MO:
-            return 1;
-        case GNSS_CONFIG_GPS_LOCK_NI:
-            return 2;
-        case GNSS_CONFIG_GPS_LOCK_MO_AND_NI:
-            return 3;
-        case GNSS_CONFIG_GPS_LOCK_NONE:
-        default:
-            return 0;
-    }
-}
 
-inline GnssConfigGpsLock
-GnssAdapter::convertGpsLock(const uint32_t gpsLock)
-{
-    switch (gpsLock) {
-        case 1:
-            return GNSS_CONFIG_GPS_LOCK_MO;
-        case 2:
-            return GNSS_CONFIG_GPS_LOCK_NI;
-        case 3:
-            return GNSS_CONFIG_GPS_LOCK_MO_AND_NI;
-        case 0:
-        default:
-            return GNSS_CONFIG_GPS_LOCK_NONE;
-    }
-}
 
 inline uint32_t
 GnssAdapter::convertSuplVersion(const GnssConfigSuplVersion suplVersion)
@@ -689,7 +659,7 @@ GnssAdapter::setConfigCommand()
                         GNSS_CONFIG_FLAGS_BLACKLISTED_SV_IDS_BIT;
                 gnssConfigRequested.gpsLock = GNSS_CONFIG_GPS_LOCK_NONE;
                 if (0 == adapter.getPowerVoteId()) {
-                    gnssConfigRequested.gpsLock = adapter.convertGpsLock(gpsConf.GPS_LOCK);
+                    gnssConfigRequested.gpsLock = gpsConf.GPS_LOCK;
                 }
 
                 if (gpsConf.AGPS_CONFIG_INJECT) {
@@ -1010,9 +980,9 @@ GnssAdapter::gnssUpdateConfigCommand(GnssConfig config)
             int index = 0;
 
             if (gnssConfigRequested.flags & GNSS_CONFIG_FLAGS_GPS_LOCK_VALID_BIT) {
-                uint32_t newGpsLock = mAdapter.convertGpsLock(gnssConfigRequested.gpsLock);
-                if (0 == newGpsLock) {
-                    newGpsLock = 3;
+                GnssConfigGpsLock newGpsLock = gnssConfigRequested.gpsLock;
+                if (GNSS_CONFIG_GPS_LOCK_NONE == newGpsLock) {
+                    newGpsLock = GNSS_CONFIG_GPS_LOCK_MO_AND_NI;
                 }
                 if (newGpsLock == ContextBase::mGps_conf.GPS_LOCK ||
                         0 != mAdapter.getPowerVoteId()) {
@@ -2336,6 +2306,9 @@ GnssAdapter::startTrackingCommand(LocationAPI* client, TrackingOptions& options)
                             mTrackingOptions.tbm, TRACKING_TBM_THRESHOLD_MILLIS);
                     mTrackingOptions.powerMode = GNSS_POWER_MODE_M2;
                 }
+                if (mTrackingOptions.minInterval < MIN_TRACKING_INTERVAL) {
+                    mTrackingOptions.minInterval = MIN_TRACKING_INTERVAL;
+                }
                 // Api doesn't support multiple clients for time based tracking, so mutiplex
                 bool reportToClientWithNoWait =
                         mAdapter.startTrackingMultiplex(mClient, mSessionId, mTrackingOptions);
@@ -2394,6 +2367,7 @@ GnssAdapter::startTrackingMultiplex(LocationAPI* client, uint32_t sessionId,
         }
         if (updateOptions) {
             // restart time based tracking with the newly updated options
+
             startTracking(client, sessionId, multiplexedOptions);
             // need to wait for QMI callback
             reportToClientWithNoWait = false;
@@ -2408,6 +2382,10 @@ void
 GnssAdapter::startTracking(LocationAPI* client, uint32_t sessionId,
         const TrackingOptions& trackingOptions)
 {
+    LOC_LOGd("minInterval %u minDistance %u mode %u powermode %u tbm %u",
+         trackingOptions.minInterval, trackingOptions.minDistance,
+         trackingOptions.mode, trackingOptions.powerMode, trackingOptions.tbm);
+
     LocPosMode locPosMode = {};
     convertOptions(locPosMode, trackingOptions);
 
@@ -2519,6 +2497,9 @@ GnssAdapter::updateTrackingOptionsCommand(LocationAPI* client, uint32_t id,
                         LOC_LOGd("TBM (%d) > %d Falling back to M2 power mode",
                                 mTrackingOptions.tbm, TRACKING_TBM_THRESHOLD_MILLIS);
                         mTrackingOptions.powerMode = GNSS_POWER_MODE_M2;
+                    }
+                    if (mTrackingOptions.minInterval < MIN_TRACKING_INTERVAL) {
+                        mTrackingOptions.minInterval = MIN_TRACKING_INTERVAL;
                     }
                     // Api doesn't support multiple clients for time based tracking, so mutiplex
                     bool reportToClientWithNoWait =
@@ -2846,7 +2827,7 @@ GnssAdapter::enableCommand(LocationTechnologyType techType)
                }));
 
                 mAdapter.mXtraObserver.updateLockStatus(
-                        mAdapter.convertGpsLock(GNSS_CONFIG_GPS_LOCK_NONE));
+                        GNSS_CONFIG_GPS_LOCK_NONE);
             }
             mAdapter.reportResponse(err, mSessionId);
         }
@@ -2890,12 +2871,12 @@ GnssAdapter::disableCommand(uint32_t id)
                 mAdapter.setPowerVoteId(0);
 
                 GnssConfigGpsLock gpsLock =
-                    mAdapter.convertGpsLock(ContextBase::mGps_conf.GPS_LOCK);
+                    ContextBase::mGps_conf.GPS_LOCK;
                 mApi.sendMsg(new LocApiMsg([&mApi = mApi,gpsLock] () {
                     mApi.setGpsLockSync(gpsLock);
                 }));
                 mAdapter.mXtraObserver.updateLockStatus(
-                        mAdapter.convertGpsLock(ContextBase::mGps_conf.GPS_LOCK));
+                        ContextBase::mGps_conf.GPS_LOCK);
             }
             mAdapter.reportResponse(err, mSessionId);
         }
