@@ -1764,6 +1764,33 @@ GnssAdapter::injectLocationCommand(double latitude, double longitude, float accu
 }
 
 void
+GnssAdapter::injectLocationExtCommand(const GnssLocationInfoNotification &locationInfo)
+{
+    LOC_LOGd("latitude %8.4f longitude %8.4f accuracy %8.4f, tech mask 0x%x",
+             locationInfo.location.latitude, locationInfo.location.longitude,
+             locationInfo.location.accuracy, locationInfo.location.techMask);
+
+    struct MsgInjectLocationExt : public LocMsg {
+        LocApiBase& mApi;
+        ContextBase& mContext;
+        GnssLocationInfoNotification mLocationInfo;
+        inline MsgInjectLocationExt(LocApiBase& api,
+                                    ContextBase& context,
+                                    GnssLocationInfoNotification locationInfo) :
+            LocMsg(),
+            mApi(api),
+            mContext(context),
+            mLocationInfo(locationInfo) {}
+        inline virtual void proc() const {
+            // false to indicate for none-ODCPI
+            mApi.injectPosition(mLocationInfo, false);
+        }
+    };
+
+    sendMsg(new MsgInjectLocationExt(*mLocApi, *mContext, locationInfo));
+}
+
+void
 GnssAdapter::injectTimeCommand(int64_t time, int64_t timeReference, int32_t uncertainty)
 {
     LOC_LOGD("%s]: time %lld timeReference %lld uncertainty %d",
@@ -3909,6 +3936,8 @@ void GnssAdapter::dataConnOpenCommand(
             LOC_LOGV("AgpsMsgAtlOpenSuccess");
             if (mApnName == nullptr) {
                 LOC_LOGE("%s] new allocation failed, fatal error.", __func__);
+                // Reporting the failure here
+                mAgpsManager->reportAtlClosed(mAgpsType);
                 return;
             }
             memcpy(mApnName, apnName, apnLen);
@@ -3925,9 +3954,16 @@ void GnssAdapter::dataConnOpenCommand(
             mAgpsManager->reportAtlOpenSuccess(mAgpsType, mApnName, mApnLen, mBearerType);
         }
     };
-
-    sendMsg( new AgpsMsgAtlOpenSuccess(
-            &mAgpsManager, agpsType, apnName, apnLen, bearerType));
+    // Added inital length checks for apnlen check to avoid security issues
+    // In case of failure reporting the same
+    if (NULL == apnName || apnLen <= 0 || apnLen > MAX_APN_LEN ||
+            (strlen(apnName) != (unsigned)apnLen)) {
+        LOC_LOGe("%s]: incorrect apnlen length or incorrect apnName", __func__);
+        mAgpsManager.reportAtlClosed(agpsType);
+    } else {
+        sendMsg( new AgpsMsgAtlOpenSuccess(
+                    &mAgpsManager, agpsType, apnName, apnLen, bearerType));
+    }
 }
 
 void GnssAdapter::dataConnClosedCommand(AGpsExtType agpsType){
