@@ -665,7 +665,8 @@ GnssAdapter::setConfigCommand()
                 if (gpsConf.AGPS_CONFIG_INJECT) {
                     gnssConfigRequested.flags |= GNSS_CONFIG_FLAGS_SET_ASSISTANCE_DATA_VALID_BIT |
                             GNSS_CONFIG_FLAGS_SUPL_VERSION_VALID_BIT |
-                            GNSS_CONFIG_FLAGS_AGLONASS_POSITION_PROTOCOL_VALID_BIT;
+                            GNSS_CONFIG_FLAGS_AGLONASS_POSITION_PROTOCOL_VALID_BIT |
+                            GNSS_CONFIG_FLAGS_LPP_PROFILE_VALID_BIT;
                     gnssConfigRequested.suplVersion =
                             adapter.mLocApi->convertSuplVersion(gpsConf.SUPL_VER);
                     gnssConfigRequested.lppProfile =
@@ -4226,9 +4227,18 @@ bool GnssAdapter::getDebugReport(GnssDebugReport& r)
               (int64_t)(reports.mTimeAndClock.back().mLeapSeconds))*1000ULL +
               (int64_t)(reports.mTimeAndClock.back().mGpsTowMs);
 
-        r.mTime.timeUncertaintyNs =
-                ((float)(reports.mTimeAndClock.back().mTimeUnc) +
-                 (float)(reports.mTimeAndClock.back().mLeapSecUnc))*1000.0f;
+        if (reports.mTimeAndClock.back().mTimeUncNs > 0) {
+            // TimeUncNs value is available
+            r.mTime.timeUncertaintyNs =
+                    (float)(reports.mTimeAndClock.back().mLeapSecUnc)*1000.0f +
+                    (float)(reports.mTimeAndClock.back().mTimeUncNs);
+        } else {
+            // fall back to legacy TimeUnc
+            r.mTime.timeUncertaintyNs =
+                    ((float)(reports.mTimeAndClock.back().mTimeUnc) +
+                     (float)(reports.mTimeAndClock.back().mLeapSecUnc))*1000.0f;
+        }
+
         r.mTime.frequencyUncertaintyNsPerSec =
             (float)(reports.mTimeAndClock.back().mClockFreqBiasUnc);
         LOC_LOGV("getDebugReport - timeestimate=%" PRIu64 " unc=%f frequnc=%f",
